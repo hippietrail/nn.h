@@ -230,6 +230,8 @@ int main(int argc, char **argv)
                 }
             }
 
+            /* hipp */ scroll = sin(((float)epoch)/200.f)/2.f+0.5f;
+
             for (size_t y = 0; y < (size_t) preview_height; ++y) {
                 for (size_t x = 0; x < (size_t) preview_width; ++x) {
                     MAT_AT(NN_INPUT(nn), 0, 0) = (float)x/(preview_width - 1);
@@ -283,6 +285,10 @@ int main(int argc, char **argv)
             char buffer[256];
             snprintf(buffer, sizeof(buffer), "Epoch: %zu/%zu, Rate: %f, Cost: %f", epoch, max_epoch, rate, plot.count > 0 ? plot.items[plot.count - 1] : 0);
             DrawText(buffer, 0, 0, h*0.04, WHITE);
+
+            char bufferhipp[128];
+            snprintf(bufferhipp, sizeof(bufferhipp), "Scroll: %f", scroll);
+            DrawText(bufferhipp, 0, h*0.04, h*0.04, YELLOW);
         }
         EndDrawing();
     }
