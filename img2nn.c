@@ -145,6 +145,8 @@ int main(int argc, char **argv)
     float scroll = 0.5f;
     bool scroll_dragging = false;
 
+    /* hipp */ float cheapest = FLT_MAX;
+
     while (!WindowShouldClose()) {
         if (IsKeyPressed(KEY_SPACE)) {
             paused = !paused;
@@ -286,31 +288,15 @@ int main(int argc, char **argv)
             snprintf(buffer, sizeof(buffer), "Epoch: %zu/%zu, Rate: %f, Cost: %f", epoch, max_epoch, rate, plot.count > 0 ? plot.items[plot.count - 1] : 0);
             DrawText(buffer, 0, 0, h*0.04, WHITE);
 
-            char bufferhipp[128];
-            snprintf(bufferhipp, sizeof(bufferhipp), "Scroll: %f", scroll);
-            DrawText(bufferhipp, 0, h*0.04, h*0.04, YELLOW);
+            // hippietrail
+            if (plot.count > 0) {
+                float cheapness = plot.items[plot.count - 1];
+                if (cheapness < cheapest) cheapest = cheapness;
+                snprintf(buffer, sizeof(buffer), "Cheapest: %f", cheapest);
+                DrawText(buffer, 0, h*0.04, h*0.04, YELLOW);
+            }
         }
         EndDrawing();
-    }
-
-    for (size_t y = 0; y < (size_t) img1_height; ++y) {
-        for (size_t x = 0; x < (size_t) img1_width; ++x) {
-            uint8_t pixel = img1_pixels[y*img1_width + x];
-            if (pixel) printf("%3u ", pixel); else printf("    ");
-        }
-        printf("\n");
-    }
-
-    for (size_t y = 0; y < (size_t) img1_height; ++y) {
-        for (size_t x = 0; x < (size_t) img1_width; ++x) {
-            MAT_AT(NN_INPUT(nn), 0, 0) = (float)x/(img1_width - 1);
-            MAT_AT(NN_INPUT(nn), 0, 1) = (float)y/(img1_height - 1);
-            MAT_AT(NN_INPUT(nn), 0, 2) = 0.5f;
-            nn_forward(nn);
-            uint8_t pixel = MAT_AT(NN_OUTPUT(nn), 0, 0)*255.f;
-            if (pixel) printf("%3u ", pixel); else printf("    ");
-        }
-        printf("\n");
     }
 
     size_t out_width = 512;

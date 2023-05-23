@@ -23,8 +23,6 @@ done
 file1=$(echo "$files" | sed "${index1}q;d")
 file2=$(echo "$files" | sed "${index2}q;d")
 
-# echo "Selected files:"
-# echo "$file1"
-# echo "$file2"
+echo "Selected files: $file1 $file2"
 
 ./img2nn $file1 $file2

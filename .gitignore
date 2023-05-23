@@ -3,3 +3,7 @@ adder_gen
 gym
 img2nn
 *.swp
+
+**/.DS_Store
+upscaled.png
+c_cpp_properties.json
