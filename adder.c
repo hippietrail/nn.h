@@ -56,7 +56,9 @@ void verify_nn_adder(Font font, NN nn, float rx, float ry, float rw, float rh)
             position.x = position.x + cs/2 - text_size.x/2;
             position.y = position.y + cs/2 - text_size.y/2;
 
-            DrawTextEx(font, buffer, position, fontSize, spacing, WHITE);
+            Color colour = (x + y > 31 ? 31 : x + y) == z && x + y > 31 == overflow ? WHITE : RED;
+
+            DrawTextEx(font, buffer, position, fontSize, spacing, colour);
         }
     }
 }
