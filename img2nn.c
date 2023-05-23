@@ -12,6 +12,14 @@
 #define NN_ENABLE_GYM
 #include "nn.h"
 
+size_t arch[] = {3, 11, 11, 9, 1};
+size_t epoch = 0;
+size_t max_epoch = 100*1000;
+size_t batches_per_frame = 200;
+size_t batch_size = 28;
+float rate = 1.0f;
+bool paused = true;
+
 char *args_shift(int *argc, char ***argv)
 {
     assert(*argc > 0);
@@ -20,8 +28,6 @@ char *args_shift(int *argc, char ***argv)
     (*argv) += 1;
     return result;
 }
-
-size_t arch[] = {3, 9, 9, 5, 1};
 
 int main(int argc, char **argv)
 {
@@ -101,6 +107,8 @@ int main(int argc, char **argv)
     SetTargetFPS(60);
 
     Plot plot = {0};
+    Font font = LoadFontEx("./fonts/iosevka-regular.ttf", 72, NULL, 0);
+    SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
 
     size_t preview_width = 28;
     size_t preview_height = 28;
@@ -132,15 +140,12 @@ int main(int argc, char **argv)
     }
     Texture2D original_texture2 = LoadTextureFromImage(original_image2);
 
-    size_t epoch = 0;
-    size_t max_epoch = 100*1000;
-    size_t batches_per_frame = 200;
-    size_t batch_size = 28;
-    size_t batch_count = (t.rows + batch_size - 1)/batch_size;
-    size_t batch_begin = 0;
-    float average_cost = 0.0f;
-    float rate = 1.0f;
-    bool paused = true;
+    size_t out_width = 512;
+    size_t out_height = 512;
+    uint8_t *out_pixels = malloc(sizeof(*out_pixels)*out_width*out_height);
+    assert(out_pixels != NULL);
+
+    Gym_Batch gb = {0};
 
     float scroll = 0.5f;
     bool scroll_dragging = false;
@@ -154,37 +159,32 @@ int main(int argc, char **argv)
             nn_rand(nn, -1, 1);
             plot.count = 0;
         }
-
-        for (size_t i = 0; i < batches_per_frame && !paused && epoch < max_epoch; ++i) {
-            size_t size = batch_size;
-            if (batch_begin + batch_size >= t.rows)  {
-                size = t.rows - batch_begin;
+        if (IsKeyPressed(KEY_S)) {
+            for (size_t y = 0; y < out_height; ++y) {
+                for (size_t x = 0; x < out_width; ++x) {
+                    MAT_AT(NN_INPUT(nn), 0, 0) = (float)x/(out_width - 1);
+                    MAT_AT(NN_INPUT(nn), 0, 1) = (float)y/(out_height - 1);
+                    MAT_AT(NN_INPUT(nn), 0, 2) = scroll;
+                    nn_forward(nn);
+                    uint8_t pixel = MAT_AT(NN_OUTPUT(nn), 0, 0)*255.f;
+                    out_pixels[y*out_width + x] = pixel;
+                }
             }
 
-            Mat batch_ti = {
-                .rows = size,
-                .cols = 3,
-                .stride = t.stride,
-                .es = &MAT_AT(t, batch_begin, 0),
-            };
+            const char *out_file_path = "upscaled.png";
+            if (!stbi_write_png(out_file_path, out_width, out_height, 1, out_pixels, out_width*sizeof(*out_pixels))) {
+                fprintf(stderr, "ERROR: could not save image %s\n", out_file_path);
+                return 1;
+            }
 
-            Mat batch_to = {
-                .rows = size,
-                .cols = 1,
-                .stride = t.stride,
-                .es = &MAT_AT(t, batch_begin, batch_ti.cols),
-            };
+            printf("Generated %s from %s\n", out_file_path, img1_file_path);
+        }
 
-            nn_backprop(nn, g, batch_ti, batch_to);
-            nn_learn(nn, g, rate);
-            average_cost += nn_cost(nn, batch_ti, batch_to);
-            batch_begin += batch_size;
-
-            if (batch_begin >= t.rows) {
+        for (size_t i = 0; i < batches_per_frame && !paused && epoch < max_epoch; ++i) {
+            gym_process_batch(&gb, batch_size, nn, g, t, rate);
+            if (gb.finished) {
                 epoch += 1;
-                da_append(&plot, average_cost/batch_count);
-                average_cost = 0.0f;
-                batch_begin = 0;
+                da_append(&plot, gb.cost);
                 mat_shuffle_rows(t);
             }
         }
@@ -282,54 +282,10 @@ int main(int argc, char **argv)
 
             char buffer[256];
             snprintf(buffer, sizeof(buffer), "Epoch: %zu/%zu, Rate: %f, Cost: %f", epoch, max_epoch, rate, plot.count > 0 ? plot.items[plot.count - 1] : 0);
-            DrawText(buffer, 0, 0, h*0.04, WHITE);
+            DrawTextEx(font, buffer, CLITERAL(Vector2){}, h*0.04, 0, WHITE);
         }
         EndDrawing();
     }
-
-    for (size_t y = 0; y < (size_t) img1_height; ++y) {
-        for (size_t x = 0; x < (size_t) img1_width; ++x) {
-            uint8_t pixel = img1_pixels[y*img1_width + x];
-            if (pixel) printf("%3u ", pixel); else printf("    ");
-        }
-        printf("\n");
-    }
-
-    for (size_t y = 0; y < (size_t) img1_height; ++y) {
-        for (size_t x = 0; x < (size_t) img1_width; ++x) {
-            MAT_AT(NN_INPUT(nn), 0, 0) = (float)x/(img1_width - 1);
-            MAT_AT(NN_INPUT(nn), 0, 1) = (float)y/(img1_height - 1);
-            MAT_AT(NN_INPUT(nn), 0, 2) = 0.5f;
-            nn_forward(nn);
-            uint8_t pixel = MAT_AT(NN_OUTPUT(nn), 0, 0)*255.f;
-            if (pixel) printf("%3u ", pixel); else printf("    ");
-        }
-        printf("\n");
-    }
-
-    size_t out_width = 512;
-    size_t out_height = 512;
-    uint8_t *out_pixels = malloc(sizeof(*out_pixels)*out_width*out_height);
-    assert(out_pixels != NULL);
-
-    for (size_t y = 0; y < out_height; ++y) {
-        for (size_t x = 0; x < out_width; ++x) {
-            MAT_AT(NN_INPUT(nn), 0, 0) = (float)x/(out_width - 1);
-            MAT_AT(NN_INPUT(nn), 0, 1) = (float)y/(out_height - 1);
-            MAT_AT(NN_INPUT(nn), 0, 2) = 0.5f;
-            nn_forward(nn);
-            uint8_t pixel = MAT_AT(NN_OUTPUT(nn), 0, 0)*255.f;
-            out_pixels[y*out_width + x] = pixel;
-        }
-    }
-
-    const char *out_file_path = "upscaled.png";
-    if (!stbi_write_png(out_file_path, out_width, out_height, 1, out_pixels, out_width*sizeof(*out_pixels))) {
-        fprintf(stderr, "ERROR: could not save image %s\n", out_file_path);
-        return 1;
-    }
-
-    printf("Generated %s from %s\n", out_file_path, img1_file_path);
 
     return 0;
 }

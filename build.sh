@@ -2,10 +2,9 @@
 
 set -xe
 
-CFLAGS="-O3 -Wall -Wextra -I./thirdparty/"
-LIBS="-lm"
+CFLAGS="-O3 -Wall -Wextra -I./thirdparty/ `pkg-config --cflags raylib`"
+LIBS="-lm -lglfw `pkg-config --libs raylib` -ldl -lpthread"
 
-clang $CFLAGS -o adder_gen adder_gen.c $LIBS
-clang $CFLAGS `pkg-config --cflags raylib` -o xor xor.c $LIBS -lglfw `pkg-config --libs raylib` -ldl -lpthread
-clang $CFLAGS `pkg-config --cflags raylib` -o gym gym.c $LIBS -lglfw `pkg-config --libs raylib` -ldl -lpthread
-clang $CFLAGS `pkg-config --cflags raylib` -o img2nn img2nn.c $LIBS -lglfw `pkg-config --libs raylib` -ldl -lpthread
+clang $CFLAGS -o adder adder.c $LIBS
+clang $CFLAGS -o xor xor.c $LIBS
+clang $CFLAGS -o img2nn img2nn.c $LIBS
